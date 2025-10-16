@@ -13,7 +13,7 @@ const data = [
 
 export function PerformanceChart() {
   return (
-    <Card className="col-span-2">
+    <Card className="col-span-1 lg:col-span-1">
       <CardHeader>
         <CardTitle>Weekly Performance</CardTitle>
       </CardHeader>

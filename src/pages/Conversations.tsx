@@ -4,9 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
-import { AlertCircle, ArrowLeft, Send, UserCog } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertCircle, ArrowLeft, Send, UserCog, FileText } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChatMessage } from "@/components/conversation/ChatMessage";
+import { VoiceInput } from "@/components/conversation/VoiceInput";
+import { TemplateVariableFiller } from "@/components/templates/TemplateVariableFiller";
 import { useToast } from "@/hooks/use-toast";
 
 interface Message {
@@ -22,6 +25,27 @@ const mockMessages: Message[] = [
   { role: "assistant", content: "I understand your concern. Let me check the tracking information for order #12345.", timestamp: "10:31 AM" },
 ];
 
+const mockTemplates = [
+  {
+    id: "1",
+    name: "Order Tracking",
+    category: "Support",
+    content: "I've checked your order {{order_id}}. Current status: {{status}}. Expected delivery: {{delivery_date}}.",
+  },
+  {
+    id: "2",
+    name: "Refund Initiated",
+    category: "Financial",
+    content: "Your refund of {{amount}} has been processed. It will appear in your account within 5-7 business days.",
+  },
+  {
+    id: "3",
+    name: "Shipping Delay",
+    category: "Support",
+    content: "We apologize for the delay with order {{order_id}}. Due to {{reason}}, your delivery is now expected on {{new_date}}.",
+  },
+];
+
 export default function Conversations() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -29,6 +53,7 @@ export default function Conversations() {
   const [isTakenOver, setIsTakenOver] = useState(false);
   const [messages, setMessages] = useState(mockMessages);
   const [inputValue, setInputValue] = useState("");
+  const [showTemplates, setShowTemplates] = useState(false);
 
   const handleTakeover = () => {
     setIsTakenOver(true);
@@ -59,15 +84,28 @@ export default function Conversations() {
     setInputValue("");
   };
 
+  const handleVoiceTranscript = (transcript: string) => {
+    setInputValue(prev => prev + (prev ? " " : "") + transcript);
+  };
+
+  const handleUseTemplate = (filledContent: string) => {
+    setInputValue(filledContent);
+    setShowTemplates(false);
+    toast({
+      title: "Template Applied",
+      description: "You can review and edit the message before sending",
+    });
+  };
+
   if (!id) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 md:space-y-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Conversations</h2>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Conversations</h2>
           <p className="text-muted-foreground">Select a conversation to view details</p>
         </div>
         <Card>
-          <CardContent className="flex items-center justify-center h-[400px]">
+          <CardContent className="flex items-center justify-center h-[300px] md:h-[400px]">
             <p className="text-muted-foreground">No conversation selected</p>
           </CardContent>
         </Card>
@@ -76,102 +114,126 @@ export default function Conversations() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" onClick={() => navigate("/")}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex-1">
-          <h2 className="text-2xl font-bold">Conversation with John Smith</h2>
-          <p className="text-sm text-muted-foreground">Order #12345 - Support Request</p>
+    <>
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          <Button variant="outline" size="icon" onClick={() => navigate("/")} className="w-fit">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1">
+            <h2 className="text-xl md:text-2xl font-bold">Conversation with John Smith</h2>
+            <p className="text-xs md:text-sm text-muted-foreground">Order #12345 - Support Request</p>
+          </div>
+          <Badge variant="outline" className="gap-1 w-fit">
+            <AlertCircle className="h-3 w-3" />
+            <span className="text-xs">Requires Attention</span>
+          </Badge>
         </div>
-        <Badge variant="outline" className="gap-1">
-          <AlertCircle className="h-3 w-3" />
-          Requires Attention
-        </Badge>
+
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <CardTitle>Conversation</CardTitle>
+              <div className="flex gap-2">
+                {!isTakenOver ? (
+                  <Button onClick={handleTakeover} className="gap-2 flex-1 sm:flex-none">
+                    <UserCog className="h-4 w-4" />
+                    <span>Take Over</span>
+                  </Button>
+                ) : (
+                  <>
+                    <Button onClick={() => setShowTemplates(true)} variant="outline" className="gap-2">
+                      <FileText className="h-4 w-4" />
+                      <span className="hidden sm:inline">Templates</span>
+                    </Button>
+                    <Button onClick={handleReturnToAI} variant="outline" className="gap-2">
+                      <span>Return to AI</span>
+                    </Button>
+                  </>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <ScrollArea className="h-[300px] md:h-[400px] pr-4">
+                <div className="space-y-4">
+                  {messages.map((message, index) => (
+                    <ChatMessage key={index} {...message} />
+                  ))}
+                </div>
+              </ScrollArea>
+              
+              {isTakenOver && (
+                <div className="flex gap-2 pt-4 border-t">
+                  <Input
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
+                    placeholder="Type or speak your message..."
+                    className="flex-1"
+                  />
+                  <VoiceInput onTranscript={handleVoiceTranscript} />
+                  <Button onClick={handleSendMessage} size="icon">
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Conversation Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <h4 className="text-sm font-medium mb-2">Customer Info</h4>
+                <div className="space-y-1 text-sm">
+                  <p><span className="text-muted-foreground">Name:</span> John Smith</p>
+                  <p><span className="text-muted-foreground">Email:</span> john@example.com</p>
+                  <p><span className="text-muted-foreground">Priority:</span> High</p>
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium mb-2">AI Metrics</h4>
+                <div className="space-y-1 text-sm">
+                  <p><span className="text-muted-foreground">Confidence:</span> 87%</p>
+                  <p><span className="text-muted-foreground">Sentiment:</span> Neutral</p>
+                  <p><span className="text-muted-foreground">Category:</span> Order Tracking</p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-medium mb-2">Suggested Actions</h4>
+                <div className="space-y-2">
+                  <Button variant="outline" size="sm" className="w-full justify-start text-xs md:text-sm">
+                    Check order status
+                  </Button>
+                  <Button variant="outline" size="sm" className="w-full justify-start text-xs md:text-sm">
+                    Issue refund
+                  </Button>
+                  <Button variant="outline" size="sm" className="w-full justify-start text-xs md:text-sm">
+                    Escalate to manager
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Conversation</CardTitle>
-            {!isTakenOver ? (
-              <Button onClick={handleTakeover} className="gap-2">
-                <UserCog className="h-4 w-4" />
-                Take Over
-              </Button>
-            ) : (
-              <Button onClick={handleReturnToAI} variant="outline" className="gap-2">
-                Return to AI
-              </Button>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ScrollArea className="h-[400px] pr-4">
-              <div className="space-y-4">
-                {messages.map((message, index) => (
-                  <ChatMessage key={index} {...message} />
-                ))}
-              </div>
-            </ScrollArea>
-            
-            {isTakenOver && (
-              <div className="flex gap-2 pt-4 border-t">
-                <Input
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
-                  placeholder="Type your message..."
-                  className="flex-1"
-                />
-                <Button onClick={handleSendMessage} size="icon">
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Conversation Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h4 className="text-sm font-medium mb-2">Customer Info</h4>
-              <div className="space-y-1 text-sm">
-                <p><span className="text-muted-foreground">Name:</span> John Smith</p>
-                <p><span className="text-muted-foreground">Email:</span> john@example.com</p>
-                <p><span className="text-muted-foreground">Priority:</span> High</p>
-              </div>
-            </div>
-            
-            <div>
-              <h4 className="text-sm font-medium mb-2">AI Metrics</h4>
-              <div className="space-y-1 text-sm">
-                <p><span className="text-muted-foreground">Confidence:</span> 87%</p>
-                <p><span className="text-muted-foreground">Sentiment:</span> Neutral</p>
-                <p><span className="text-muted-foreground">Category:</span> Order Tracking</p>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium mb-2">Suggested Actions</h4>
-              <div className="space-y-2">
-                <Button variant="outline" size="sm" className="w-full justify-start">
-                  Check order status
-                </Button>
-                <Button variant="outline" size="sm" className="w-full justify-start">
-                  Issue refund
-                </Button>
-                <Button variant="outline" size="sm" className="w-full justify-start">
-                  Escalate to manager
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+      <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Use Template</DialogTitle>
+          </DialogHeader>
+          <TemplateVariableFiller
+            templates={mockTemplates}
+            onUseTemplate={handleUseTemplate}
+            onCancel={() => setShowTemplates(false)}
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

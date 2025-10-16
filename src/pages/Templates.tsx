@@ -1,18 +1,18 @@
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { TemplateEditor } from "@/components/templates/TemplateEditor";
 
 interface Template {
   id: string;
   name: string;
   category: string;
   content: string;
+  variables?: string[];
+  shared?: boolean;
 }
 
 const mockTemplates: Template[] = [
@@ -20,19 +20,33 @@ const mockTemplates: Template[] = [
     id: "1",
     name: "Order Tracking",
     category: "Support",
-    content: "I've checked your order #{order_id}. Current status: {status}. Expected delivery: {delivery_date}."
+    content: "I've checked your order {{order_id}}. Current status: {{status}}. Expected delivery: {{delivery_date}}.",
+    variables: ["order_id", "status", "delivery_date"],
+    shared: true
   },
   {
     id: "2",
     name: "Refund Initiated",
     category: "Financial",
-    content: "Your refund of {amount} has been processed. It will appear in your account within 5-7 business days."
+    content: "Your refund of {{amount}} has been processed. It will appear in your account within 5-7 business days.",
+    variables: ["amount"],
+    shared: true
   },
   {
     id: "3",
     name: "Product Information",
     category: "Sales",
-    content: "The {product_name} is currently available. Key features include: {features}. Price: {price}."
+    content: "The {{product_name}} is currently available. Key features include: {{features}}. Price: {{price}}.",
+    variables: ["product_name", "features", "price"],
+    shared: false
+  },
+  {
+    id: "4",
+    name: "Shipping Delay",
+    category: "Support",
+    content: "We apologize for the delay with order {{order_id}}. Due to {{reason}}, your delivery is now expected on {{new_date}}. We appreciate your patience.",
+    variables: ["order_id", "reason", "new_date"],
+    shared: true
   },
 ];
 
@@ -42,6 +56,25 @@ export default function Templates() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
+  const handleSave = (templateData: Omit<Template, 'id'>) => {
+    if (editingId) {
+      setTemplates(templates.map(t => t.id === editingId ? { ...templateData, id: editingId } : t));
+      toast({
+        title: "Template Updated",
+        description: "The template has been updated successfully",
+      });
+      setEditingId(null);
+    } else {
+      const newTemplate = { ...templateData, id: Date.now().toString() };
+      setTemplates([...templates, newTemplate]);
+      toast({
+        title: "Template Created",
+        description: "New template has been added successfully",
+      });
+      setIsCreating(false);
+    }
+  };
+
   const handleDelete = (id: string) => {
     setTemplates(templates.filter(t => t.id !== id));
     toast({
@@ -50,60 +83,35 @@ export default function Templates() {
     });
   };
 
+  const editingTemplate = editingId ? templates.find(t => t.id === editingId) : null;
+
   return (
     <div className="space-y-6 max-w-6xl">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Response Templates</h2>
-          <p className="text-muted-foreground">Manage pre-configured responses for common scenarios</p>
+          <p className="text-muted-foreground">Manage pre-configured responses with variables</p>
         </div>
-        <Button onClick={() => setIsCreating(true)} className="gap-2">
+        <Button onClick={() => setIsCreating(true)} className="gap-2 w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           New Template
         </Button>
       </div>
 
-      {isCreating && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Create New Template</CardTitle>
-            <CardDescription>Define a reusable response template</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Template Name</Label>
-              <Input placeholder="e.g., Order Confirmation" />
-            </div>
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <Input placeholder="e.g., Support, Sales, Financial" />
-            </div>
-            <div className="space-y-2">
-              <Label>Template Content</Label>
-              <Textarea 
-                placeholder="Use {variable_name} for dynamic content"
-                rows={4}
-              />
-              <p className="text-xs text-muted-foreground">
-                Use curly braces for variables: {"{order_id}"}, {"{customer_name}"}, etc.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={() => {
-                setIsCreating(false);
-                toast({
-                  title: "Template Created",
-                  description: "New template has been added successfully",
-                });
-              }}>
-                Create Template
-              </Button>
-              <Button variant="outline" onClick={() => setIsCreating(false)}>
-                Cancel
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      {(isCreating || editingId) && (
+        <TemplateEditor
+          onSave={handleSave}
+          onCancel={() => {
+            setIsCreating(false);
+            setEditingId(null);
+          }}
+          initialTemplate={editingTemplate ? {
+            name: editingTemplate.name,
+            category: editingTemplate.category,
+            content: editingTemplate.content,
+            shared: editingTemplate.shared || false
+          } : undefined}
+        />
       )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -111,9 +119,17 @@ export default function Templates() {
           <Card key={template.id}>
             <CardHeader>
               <div className="flex items-start justify-between">
-                <div className="space-y-1">
+                <div className="space-y-2 flex-1">
                   <CardTitle className="text-lg">{template.name}</CardTitle>
-                  <Badge variant="secondary">{template.category}</Badge>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="secondary">{template.category}</Badge>
+                    {template.shared && (
+                      <Badge variant="outline" className="gap-1">
+                        <Users className="h-3 w-3" />
+                        Shared
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 <div className="flex gap-1">
                   <Button
@@ -133,10 +149,19 @@ export default function Templates() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground line-clamp-3">
                 {template.content}
               </p>
+              {template.variables && template.variables.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {template.variables.map(variable => (
+                    <Badge key={variable} variant="outline" className="text-xs">
+                      {variable}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}

@@ -85,28 +85,28 @@ export function ConversationList() {
   };
 
   return (
-    <Card className="col-span-2">
+    <Card className="col-span-1 lg:col-span-1">
       <CardHeader>
         <CardTitle>Active Conversations</CardTitle>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px]">
-          <div className="space-y-4">
+        <ScrollArea className="h-[300px] md:h-[400px]">
+          <div className="space-y-3 md:space-y-4">
             {mockConversations.map((conversation) => (
               <div
                 key={conversation.id}
                 onClick={() => navigate(`/conversations/${conversation.id}`)}
-                className="flex items-start gap-4 p-4 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+                className="flex items-start gap-3 md:gap-4 p-3 md:p-4 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
               >
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium">{conversation.customer}</p>
-                    <Badge className={getStatusColor(conversation.status)} variant="default">
+                <div className="flex-1 space-y-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-medium text-sm md:text-base truncate">{conversation.customer}</p>
+                    <Badge className={`${getStatusColor(conversation.status)} text-xs`} variant="default">
                       {getStatusIcon(conversation.status)}
-                      <span className="ml-1 capitalize">{conversation.status}</span>
+                      <span className="ml-1 capitalize hidden sm:inline">{conversation.status}</span>
                     </Badge>
                   </div>
-                  <p className={`text-sm ${getSentimentColor(conversation.sentiment)}`}>
+                  <p className={`text-xs md:text-sm ${getSentimentColor(conversation.sentiment)} line-clamp-1`}>
                     {conversation.lastMessage}
                   </p>
                   <p className="text-xs text-muted-foreground">{conversation.timestamp}</p>
